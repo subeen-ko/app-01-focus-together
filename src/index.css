@@ -32,6 +32,8 @@ body::before {
     radial-gradient(circle at 15% 5%, rgba(139, 92, 246, .13), transparent 28rem),
     radial-gradient(circle at 88% 35%, rgba(103, 247, 193, .06), transparent 30rem);
 }
+.startup-state { min-height: 100vh; display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--muted); }
+.startup-state svg { color: var(--mint); }
 
 .app-shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding-bottom: 64px; position: relative; }
 .narrow-shell { width: min(620px, calc(100% - 32px)); padding-top: 34px; }

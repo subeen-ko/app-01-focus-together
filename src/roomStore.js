@@ -2,13 +2,62 @@ import { createClient } from '@supabase/supabase-js'
 
 const STORAGE_KEY = 'focus-together-demo-rooms'
 const url = import.meta.env.VITE_SUPABASE_URL
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const hasSupabase = Boolean(url && anonKey && !url.includes('YOUR_'))
-const supabase = hasSupabase ? createClient(url, anonKey) : null
+const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
+const hasSupabase = Boolean(url && publishableKey && !url.includes('YOUR_'))
+
+function isPrivilegedKey(key) {
+  if (!key) return false
+  if (key.startsWith('sb_secret_')) return true
+  try {
+    const payload = JSON.parse(atob(key.split('.')[1]))
+    return payload.role === 'service_role'
+  } catch {
+    return false
+  }
+}
+
+const unsafeBrowserKey = isPrivilegedKey(publishableKey)
+const supabase = hasSupabase && !unsafeBrowserKey ? createClient(url, publishableKey) : null
+let authPromise
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
 const makeCode = () => Math.random().toString(36).slice(2, 8).toUpperCase()
 const nowIso = () => new Date().toISOString()
+
+function getDemoUserId() {
+  const saved = localStorage.getItem('focus-together-user-id')
+  if (saved) return saved
+  const id = crypto.randomUUID()
+  localStorage.setItem('focus-together-user-id', id)
+  return id
+}
+
+async function ensureAuthenticatedUser() {
+  if (!hasSupabase) return getDemoUserId()
+  if (unsafeBrowserKey) {
+    throw new Error('브라우저 환경변수에는 Supabase publishable 키만 사용할 수 있어요.')
+  }
+  if (!authPromise) {
+    authPromise = (async () => {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw new Error('사용자 세션을 확인하지 못했어요.')
+      if (sessionData.session?.user?.id) return sessionData.session.user.id
+
+      const { data, error } = await supabase.auth.signInAnonymously()
+      if (error || !data.user?.id) throw new Error('익명 로그인을 사용할 수 없어요. Supabase Auth 설정을 확인해주세요.')
+      return data.user.id
+    })()
+  }
+  return authPromise
+}
+
+function safeDatabaseError(error, fallback) {
+  console.error('[같이집중] database request failed', {
+    code: error?.code,
+    status: error?.status,
+  })
+  return new Error(fallback)
+}
 
 function readDemoRooms() {
   try {
@@ -56,16 +105,21 @@ function mapRoom(row, participants = [], messages = []) {
 }
 
 async function getSupabaseRoom(id) {
+  await ensureAuthenticatedUser()
   const [{ data: room, error }, { data: participants }, { data: messages }] = await Promise.all([
     supabase.from('rooms').select('*').eq('id', id).maybeSingle(),
     supabase.from('participants').select('*').eq('room_id', id).order('joined_at'),
     supabase.from('messages').select('*').eq('room_id', id).order('created_at').limit(100),
   ])
-  if (error) throw error
+  if (error) throw safeDatabaseError(error, '방 정보를 불러오지 못했어요.')
   return room ? mapRoom(room, participants || [], messages || []) : null
 }
 
 const demoStore = {
+  async getUserId() {
+    return getDemoUserId()
+  },
+
   async listPublicRooms() {
     return readDemoRooms()
       .filter((room) => !room.isLocked)
@@ -202,79 +256,86 @@ const demoStore = {
 }
 
 const supabaseStore = {
+  async getUserId() {
+    return ensureAuthenticatedUser()
+  },
+
   async listPublicRooms() {
+    await ensureAuthenticatedUser()
     const { data, error } = await supabase
       .from('rooms')
-      .select('*, participants(count)')
+      .select('*')
       .eq('is_locked', false)
       .order('created_at', { ascending: false })
       .limit(20)
-    if (error) throw error
+    if (error) throw safeDatabaseError(error, '공개방 목록을 불러오지 못했어요.')
     return data.map((room) => ({
       ...mapRoom(room),
-      participantCount: room.participants?.[0]?.count || 0,
+      participantCount: room.participant_count || 0,
     }))
   },
 
   async createRoom(settings) {
+    await ensureAuthenticatedUser()
     const { data, error } = await supabase.rpc('create_focus_room', {
       p_name: settings.name,
       p_pin: settings.pin || null,
       p_focus_seconds: settings.focusSeconds,
       p_break_seconds: settings.breakSeconds,
-      p_user_id: settings.userId,
       p_nickname: settings.nickname,
     })
-    if (error) throw error
+    if (error) throw safeDatabaseError(error, '방을 만들지 못했어요. 입력값을 확인하고 잠시 후 다시 시도해주세요.')
     return getSupabaseRoom(data)
   },
 
   async joinRoom(settings) {
+    await ensureAuthenticatedUser()
     const { data, error } = await supabase.rpc('join_focus_room', {
       p_code: settings.code.toUpperCase(),
       p_pin: settings.pin || null,
-      p_user_id: settings.userId,
       p_nickname: settings.nickname,
     })
-    if (error) throw new Error(error.message.includes('PIN') ? '잠금 PIN이 맞지 않아요.' : error.message)
+    if (error) throw safeDatabaseError(error, '방 코드 또는 PIN을 확인해주세요.')
     return getSupabaseRoom(data)
   },
 
   getRoom: getSupabaseRoom,
 
-  async updateParticipant(roomId, userId, updates) {
-    const values = {}
-    if ('task' in updates) values.task = updates.task
-    if ('isReady' in updates) values.is_ready = updates.isReady
-    const { error } = await supabase.from('participants').update(values).eq('room_id', roomId).eq('user_id', userId)
-    if (error) throw error
-  },
-
-  async startFocus(roomId, userId) {
-    const { error } = await supabase.rpc('start_focus_session', { p_room_id: roomId, p_user_id: userId })
-    if (error) throw error
-  },
-
-  async advancePhase(roomId, userId) {
-    const { error } = await supabase.rpc('advance_focus_phase', { p_room_id: roomId, p_user_id: userId })
-    if (error) throw error
-  },
-
-  async sendMessage(roomId, userId, nickname, content) {
-    const room = await getSupabaseRoom(roomId)
-    if (room.phase !== 'break') throw new Error('채팅은 쉬는 시간에만 열려요.')
-    const { error } = await supabase.from('messages').insert({
-      room_id: roomId,
-      user_id: userId,
-      nickname,
-      content,
+  async updateParticipant(roomId, _userId, updates) {
+    await ensureAuthenticatedUser()
+    const { error } = await supabase.rpc('update_focus_participant', {
+      p_room_id: roomId,
+      p_task: 'task' in updates ? updates.task : null,
+      p_is_ready: 'isReady' in updates ? updates.isReady : null,
     })
-    if (error) throw error
+    if (error) throw safeDatabaseError(error, '참가자 상태를 저장하지 못했어요.')
   },
 
-  async leaveRoom(roomId, userId) {
-    const { error } = await supabase.rpc('leave_focus_room', { p_room_id: roomId, p_user_id: userId })
-    if (error) throw error
+  async startFocus(roomId) {
+    await ensureAuthenticatedUser()
+    const { error } = await supabase.rpc('start_focus_session', { p_room_id: roomId })
+    if (error) throw safeDatabaseError(error, '모두 준비됐는지 확인해주세요.')
+  },
+
+  async advancePhase(roomId) {
+    await ensureAuthenticatedUser()
+    const { error } = await supabase.rpc('advance_focus_phase', { p_room_id: roomId })
+    if (error) throw safeDatabaseError(error, '타이머를 전환하지 못했어요.')
+  },
+
+  async sendMessage(roomId, _userId, _nickname, content) {
+    await ensureAuthenticatedUser()
+    const { error } = await supabase.rpc('send_focus_message', {
+      p_room_id: roomId,
+      p_content: content,
+    })
+    if (error) throw safeDatabaseError(error, '메시지를 보내지 못했어요.')
+  },
+
+  async leaveRoom(roomId) {
+    await ensureAuthenticatedUser()
+    const { error } = await supabase.rpc('leave_focus_room', { p_room_id: roomId })
+    if (error) throw safeDatabaseError(error, '방에서 나가지 못했어요.')
   },
 
   subscribe(_roomId, callback) {

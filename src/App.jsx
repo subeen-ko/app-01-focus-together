@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
   Check,
@@ -26,14 +26,6 @@ import { roomStore } from './roomStore.js'
 
 const DEFAULT_FOCUS_SECONDS = 25 * 60
 const DEFAULT_BREAK_SECONDS = 5 * 60
-function makeUserId() {
-  const saved = localStorage.getItem('focus-together-user-id')
-  if (saved) return saved
-  const id = crypto.randomUUID()
-  localStorage.setItem('focus-together-user-id', id)
-  return id
-}
-
 function formatTime(totalSeconds) {
   const safeSeconds = Math.max(0, totalSeconds)
   const minutes = Math.floor(safeSeconds / 60)
@@ -574,7 +566,8 @@ function RoomScreen({ room, userId, onLeave, onRefresh }) {
 }
 
 export default function App() {
-  const userId = useMemo(makeUserId, [])
+  const [userId, setUserId] = useState(null)
+  const [startupError, setStartupError] = useState('')
   const [nickname, setNicknameState] = useState(() => localStorage.getItem('focus-together-nickname') || '')
   const [rooms, setRooms] = useState([])
   const [room, setRoom] = useState(null)
@@ -597,13 +590,20 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    refreshRooms().catch(console.error)
+    roomStore.getUserId()
+      .then(setUserId)
+      .then(refreshRooms)
+      .catch(() => setStartupError('안전한 사용자 세션을 만들지 못했어요. 잠시 후 새로고침해주세요.'))
+  }, [refreshRooms])
+
+  useEffect(() => {
+    if (!userId) return undefined
     const unsubscribe = roomStore.subscribe(null, () => {
       refreshRooms().catch(console.error)
       refreshRoom().catch(console.error)
     })
     return unsubscribe
-  }, [refreshRoom, refreshRooms])
+  }, [refreshRoom, refreshRooms, userId])
 
   const enterRoom = (nextRoom) => {
     roomIdRef.current = nextRoom.id
@@ -626,6 +626,14 @@ export default function App() {
     roomIdRef.current = null
     setRoom(null)
     refreshRooms().catch(console.error)
+  }
+
+  if (startupError) {
+    return <main className="startup-state"><ShieldAlert size={28} /><strong>{startupError}</strong></main>
+  }
+
+  if (!userId) {
+    return <main className="startup-state"><ShieldCheck size={28} /><strong>안전한 세션을 준비하는 중…</strong></main>
   }
 
   return room ? (
