@@ -13,6 +13,9 @@ function getAudioContext() {
   if (sharedAudioContext.state === 'suspended') {
     sharedAudioContext.resume();
   }
+  return sharedAudioContext;
+}
+
 // Global AudioContext for mobile compatibility
 let globalAudioCtx = null;
 
