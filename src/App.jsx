@@ -388,6 +388,25 @@ export default function App() {
           </button>
         )}
       </section>
+
+      {/* 광고 배너 Placeholder */}
+      <div 
+        aria-label="광고 영역"
+        style={{
+          marginTop: '30px',
+          width: '100%',
+          height: '80px',
+          border: '2px dashed var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--border)',
+          fontSize: '12px',
+          opacity: 0.5
+        }}
+      >
+        ADVERTISEMENT
+      </div>
     </main>
   );
 }
