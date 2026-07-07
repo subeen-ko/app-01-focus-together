@@ -297,6 +297,32 @@ export default function App() {
               </button>
             </div>
 
+            <div className="settings-row">
+              <span style={{ fontSize: '14px', marginBottom: '10px' }}>반복 세트 수</span>
+              <div className="setting-controls">
+                <button
+                  className="btn-secondary"
+                  style={{ padding: '10px 20px', fontSize: '20px' }}
+                  onClick={() => setSetsInput(Math.max(1, setsInput - 1))}
+                  type="button"
+                  aria-label="반복 세트 줄이기"
+                >
+                  -
+                </button>
+                <span style={{ fontSize: '32px', fontFamily: "'Press Start 2P', cursive", color: 'var(--text)' }}>
+                  {setsInput}
+                </span>
+                <button
+                  className="btn-secondary"
+                  style={{ padding: '10px 20px', fontSize: '20px' }}
+                  onClick={() => setSetsInput(setsInput + 1)}
+                  type="button"
+                  aria-label="반복 세트 늘리기"
+                >
+                  +
+                </button>
+              </div>
+
               <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', marginTop: '30px', width: '100%'}}>
                 <button 
                   className="btn-secondary" 
