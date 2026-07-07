@@ -120,6 +120,15 @@ export default function App() {
     secondsLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
   }
 
+  let exactProgress = 0;
+  if ((phase === 'focus' || phase === 'break') && endTime) {
+    const totalMs = (phase === 'focus' ? focusInput : breakInput) * 1000;
+    if (totalMs > 0) {
+      const msLeft = Math.max(0, endTime - now);
+      exactProgress = 1 - (msLeft / totalMs);
+    }
+  }
+
   useEffect(() => {
     if (phase === 'idle' || phase === 'clear' || !endTime) return;
 
@@ -234,6 +243,15 @@ export default function App() {
           {countdownStep || formatTime(displayedSeconds)}
         </div>
 
+        {(phase === 'focus' || phase === 'break') && (
+          <div style={{ width: '100%', height: '15px', border: `2px dashed ${boxBorderColor}`, position: 'relative', marginTop: '30px', background: 'transparent' }}>
+            <div style={{ width: `${Math.min(100, exactProgress * 100)}%`, height: '100%', background: boxBorderColor, opacity: 0.3 }}></div>
+            <div style={{ position: 'absolute', top: '-11px', left: `calc(${Math.min(100, exactProgress * 100)}% - 12px)`, fontSize: '24px', textShadow: '2px 2px 0px var(--bg)' }}>
+              ❤️
+            </div>
+          </div>
+        )}
+
         {phase === 'idle' && (
           <>
             <div className="toggle-container" aria-label="시간 종류 선택">
@@ -279,50 +297,44 @@ export default function App() {
               </button>
             </div>
 
-            <div className="settings-row">
-              <span style={{ fontSize: '14px', marginBottom: '10px' }}>반복 세트 수</span>
-              <div className="setting-controls">
-                <button
-                  className="btn-secondary"
-                  style={{ padding: '10px 20px', fontSize: '20px' }}
-                  onClick={() => setSetsInput(Math.max(1, setsInput - 1))}
-                  type="button"
-                  aria-label="반복 세트 줄이기"
-                >
-                  -
-                </button>
-                <span style={{ fontSize: '32px', fontFamily: "'Press Start 2P', cursive", color: 'var(--text)' }}>
-                  {setsInput}
-                </span>
-                <button
-                  className="btn-secondary"
-                  style={{ padding: '10px 20px', fontSize: '20px' }}
-                  onClick={() => setSetsInput(setsInput + 1)}
-                  type="button"
-                  aria-label="반복 세트 늘리기"
-                >
-                  +
-                </button>
-              </div>
-              
-              <div style={{marginTop: '25px'}}>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', marginTop: '30px', width: '100%'}}>
                 <button 
                   className="btn-secondary" 
                   style={{
-                    padding: '8px 12px', 
-                    fontSize: '12px', 
+                    padding: '10px 15px', 
+                    fontSize: '24px', 
                     borderColor: soundMode !== 'off' ? 'var(--accent-pink)' : 'var(--border)', 
-                    color: soundMode !== 'off' ? 'var(--accent-pink)' : 'var(--text)'
+                    color: soundMode !== 'off' ? 'var(--accent-pink)' : 'var(--text)',
+                    borderRadius: '50%'
                   }} 
                   onClick={() => {
-                    if (soundMode === '5s') setSoundMode('all');
-                    else if (soundMode === 'all') setSoundMode('off');
-                    else setSoundMode('5s');
+                    if (soundMode === 'off') setSoundMode('5s');
+                    else setSoundMode('off');
                   }}
                   type="button"
+                  title={soundMode === 'off' ? "소리 켜기" : "소리 끄기"}
                 >
-                  띠띠띠 소리: {soundMode === '5s' ? '5초만 🔊' : soundMode === 'all' ? '전체 ON 🔊' : '아예 끄기 🔇'}
+                  {soundMode === 'off' ? '🔇' : '🔊'}
                 </button>
+
+                {soundMode !== 'off' && (
+                  <button 
+                    className="btn-secondary" 
+                    style={{
+                      padding: '8px 15px', 
+                      fontSize: '14px', 
+                      borderColor: 'var(--accent-pink)', 
+                      color: 'var(--accent-pink)'
+                    }} 
+                    onClick={() => {
+                      if (soundMode === '5s') setSoundMode('all');
+                      else setSoundMode('5s');
+                    }}
+                    type="button"
+                  >
+                    {soundMode === '5s' ? '마지막 5초만' : '매 초마다'}
+                  </button>
+                )}
               </div>
             </div>
           </>
