@@ -156,8 +156,6 @@ export default function App() {
       } else if (soundMode === '5s') {
         if (secondsLeft <= 5) {
           playRetroBeep(880, 100);
-        } else {
-          playTickSound();
         }
       }
       // 'off'일 때는 아무 소리도 내지 않음 (조용히 카운트다운)
