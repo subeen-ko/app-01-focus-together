@@ -13,31 +13,58 @@ function getAudioContext() {
   if (sharedAudioContext.state === 'suspended') {
     sharedAudioContext.resume();
   }
+// Global AudioContext for mobile compatibility
+let globalAudioCtx = null;
 
-  return sharedAudioContext;
+function initAudio() {
+  try {
+    if (!globalAudioCtx) {
+      globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (globalAudioCtx.state === 'suspended') {
+      globalAudioCtx.resume();
+    }
+    
+    // Play a silent sound to force iOS Safari to unlock AudioContext
+    const oscillator = globalAudioCtx.createOscillator();
+    const gainNode = globalAudioCtx.createGain();
+    
+    gainNode.gain.value = 0; // Silent
+    oscillator.connect(gainNode);
+    gainNode.connect(globalAudioCtx.destination);
+    
+    oscillator.start();
+    oscillator.stop(globalAudioCtx.currentTime + 0.001);
+  } catch(e) {
+    console.error('Audio initialization failed', e);
+  }
+}
+
+function playRetroBeep(frequency = 880, duration = 150) {
+  try {
+    if (!globalAudioCtx) initAudio();
+    
+    const oscillator = globalAudioCtx.createOscillator();
+    const gainNode = globalAudioCtx.createGain();
+    
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(frequency, globalAudioCtx.currentTime);
+    
+    gainNode.gain.setValueAtTime(0.1, globalAudioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, globalAudioCtx.currentTime + duration/1000);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(globalAudioCtx.destination);
+    
+    oscillator.start();
+    oscillator.stop(globalAudioCtx.currentTime + duration/1000);
+  } catch(e) {
+    console.error('AudioContext not supported or blocked', e);
+  }
 }
 
 function playTone(frequency = 880, duration = 90, startOffset = 0, volume = 0.08) {
-  try {
-    const audioCtx = getAudioContext();
-    if (!audioCtx) return;
-
-    const startAt = audioCtx.currentTime + startOffset;
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-
-    oscillator.type = 'square';
-    oscillator.frequency.setValueAtTime(frequency, startAt);
-    gainNode.gain.setValueAtTime(volume, startAt);
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, startAt + duration / 1000);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.start(startAt);
-    oscillator.stop(startAt + duration / 1000);
-  } catch (error) {
-    console.info('AudioContext is unavailable until the user interacts with the page.', error);
-  }
+  playRetroBeep(frequency, duration);
 }
 
 function playTickSound() {
@@ -122,6 +149,8 @@ export default function App() {
   }, [now, endTime, phase, currentSet, setsInput, focusInput, breakInput, secondsLeft]);
 
   const startTimer = () => {
+    initAudio(); // 모바일 브라우저 오디오 권한 해제 (User Interaction)
+    
     const focusSeconds = focusInput > 0 ? focusInput : 30;
     const currentTime = Date.now();
     const startTime = currentTime + 1000;
