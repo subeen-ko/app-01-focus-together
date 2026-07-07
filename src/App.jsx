@@ -124,7 +124,7 @@ export default function App() {
     if (phase === 'idle' || phase === 'clear' || !endTime) return;
 
     if (now >= endTime) {
-      playFinalRing();
+      if (soundMode !== 'off') playFinalRing();
       lastTickedSecond.current = null;
       lastBeepedSecond.current = null;
 
@@ -179,7 +179,7 @@ export default function App() {
     setPhase('focus');
     lastTickedSecond.current = null;
     lastBeepedSecond.current = null;
-    playTickSound();
+    if (soundMode !== 'off') playTickSound();
 
     setTimeout(() => {
       setNow(Date.now());
