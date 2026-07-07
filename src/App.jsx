@@ -94,7 +94,7 @@ export default function App() {
   const [breakInput, setBreakInput] = useState(0);
   const [setsInput, setSetsInput] = useState(5);
   const [activeInput, setActiveInput] = useState('focus');
-  const [sound5s, setSound5s] = useState(true);
+  const [soundMode, setSoundMode] = useState('5s'); // '5s', 'all', 'off'
 
   const [phase, setPhase] = useState('idle');
   const [endTime, setEndTime] = useState(null);
@@ -148,16 +148,18 @@ export default function App() {
     } else if (secondsLeft > 0 && lastTickedSecond.current !== secondsLeft) {
       lastTickedSecond.current = secondsLeft;
       
-      if (secondsLeft <= 5 && sound5s) {
-        if (lastBeepedSecond.current !== secondsLeft) {
-          lastBeepedSecond.current = secondsLeft;
+      if (soundMode === 'all') {
+        playRetroBeep(880, 100);
+      } else if (soundMode === '5s') {
+        if (secondsLeft <= 5) {
           playRetroBeep(880, 100);
+        } else {
+          playTickSound();
         }
-      } else {
-        playTickSound();
       }
+      // 'off'일 때는 아무 소리도 내지 않음 (조용히 카운트다운)
     }
-  }, [now, endTime, phase, currentSet, setsInput, focusInput, breakInput, secondsLeft, sound5s]);
+  }, [now, endTime, phase, currentSet, setsInput, focusInput, breakInput, secondsLeft, soundMode]);
 
   const startTimer = () => {
     initAudio(); 
@@ -305,11 +307,20 @@ export default function App() {
               <div style={{marginTop: '25px'}}>
                 <button 
                   className="btn-secondary" 
-                  style={{padding: '8px 12px', fontSize: '12px', borderColor: sound5s ? 'var(--accent-pink)' : 'var(--border)', color: sound5s ? 'var(--accent-pink)' : 'var(--text)'}} 
-                  onClick={() => setSound5s(!sound5s)}
+                  style={{
+                    padding: '8px 12px', 
+                    fontSize: '12px', 
+                    borderColor: soundMode !== 'off' ? 'var(--accent-pink)' : 'var(--border)', 
+                    color: soundMode !== 'off' ? 'var(--accent-pink)' : 'var(--text)'
+                  }} 
+                  onClick={() => {
+                    if (soundMode === '5s') setSoundMode('all');
+                    else if (soundMode === 'all') setSoundMode('off');
+                    else setSoundMode('5s');
+                  }}
                   type="button"
                 >
-                  5초 전 띠띠띠 소리: {sound5s ? 'ON 🔊' : 'OFF 🔇'}
+                  띠띠띠 소리: {soundMode === '5s' ? '5초만 🔊' : soundMode === 'all' ? '전체 ON 🔊' : '아예 끄기 🔇'}
                 </button>
               </div>
             </div>
