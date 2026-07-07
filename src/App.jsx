@@ -94,6 +94,7 @@ export default function App() {
   const [breakInput, setBreakInput] = useState(0);
   const [setsInput, setSetsInput] = useState(5);
   const [activeInput, setActiveInput] = useState('focus');
+  const [sound5s, setSound5s] = useState(true);
 
   const [phase, setPhase] = useState('idle');
   const [endTime, setEndTime] = useState(null);
@@ -102,6 +103,7 @@ export default function App() {
   const [now, setNow] = useState(Date.now());
 
   const lastTickedSecond = useRef(null);
+  const lastBeepedSecond = useRef(null);
 
   useEffect(() => {
     if (phase === 'idle' || phase === 'clear' || countdownStep) return undefined;
@@ -121,6 +123,7 @@ export default function App() {
     if (now >= endTime) {
       playFinalRing();
       lastTickedSecond.current = null;
+      lastBeepedSecond.current = null;
 
       if (phase === 'focus') {
         if (currentSet >= setsInput) {
@@ -144,12 +147,20 @@ export default function App() {
       }
     } else if (secondsLeft > 0 && lastTickedSecond.current !== secondsLeft) {
       lastTickedSecond.current = secondsLeft;
-      playTickSound();
+      
+      if (secondsLeft <= 5 && sound5s) {
+        if (lastBeepedSecond.current !== secondsLeft) {
+          lastBeepedSecond.current = secondsLeft;
+          playRetroBeep(880, 100);
+        }
+      } else {
+        playTickSound();
+      }
     }
-  }, [now, endTime, phase, currentSet, setsInput, focusInput, breakInput, secondsLeft]);
+  }, [now, endTime, phase, currentSet, setsInput, focusInput, breakInput, secondsLeft, sound5s]);
 
   const startTimer = () => {
-    initAudio(); // 모바일 브라우저 오디오 권한 해제 (User Interaction)
+    initAudio(); 
     
     const focusSeconds = focusInput > 0 ? focusInput : 30;
     const currentTime = Date.now();
@@ -162,6 +173,7 @@ export default function App() {
     setCurrentSet(1);
     setPhase('focus');
     lastTickedSecond.current = null;
+    lastBeepedSecond.current = null;
     playTickSound();
 
     setTimeout(() => {
@@ -176,6 +188,7 @@ export default function App() {
     setCurrentSet(1);
     setCountdownStep(null);
     lastTickedSecond.current = null;
+    lastBeepedSecond.current = null;
   };
 
   const addTime = (seconds) => {
@@ -286,6 +299,17 @@ export default function App() {
                   aria-label="반복 세트 늘리기"
                 >
                   +
+                </button>
+              </div>
+              
+              <div style={{marginTop: '25px'}}>
+                <button 
+                  className="btn-secondary" 
+                  style={{padding: '8px 12px', fontSize: '12px', borderColor: sound5s ? 'var(--accent-pink)' : 'var(--border)', color: sound5s ? 'var(--accent-pink)' : 'var(--text)'}} 
+                  onClick={() => setSound5s(!sound5s)}
+                  type="button"
+                >
+                  5초 전 띠띠띠 소리: {sound5s ? 'ON 🔊' : 'OFF 🔇'}
                 </button>
               </div>
             </div>
