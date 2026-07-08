@@ -1,6 +1,67 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 let sharedAudioContext;
+const toneCache = new Map();
+
+function makeWavDataUri(frequency = 880, duration = 120, volume = 0.75) {
+  const cacheKey = `${frequency}-${duration}-${volume}`;
+  if (toneCache.has(cacheKey)) return toneCache.get(cacheKey);
+
+  const sampleRate = 44100;
+  const sampleCount = Math.floor(sampleRate * (duration / 1000));
+  const bytesPerSample = 2;
+  const dataSize = sampleCount * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  const writeString = (offset, value) => {
+    for (let i = 0; i < value.length; i += 1) {
+      view.setUint8(offset + i, value.charCodeAt(i));
+    }
+  };
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  for (let i = 0; i < sampleCount; i += 1) {
+    const t = i / sampleRate;
+    const fade = Math.min(1, i / 300, (sampleCount - i) / 300);
+    const sample = Math.sin(2 * Math.PI * frequency * t) * volume * fade;
+    view.setInt16(44 + i * bytesPerSample, sample * 32767, true);
+  }
+
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+
+  const uri = `data:audio/wav;base64,${btoa(binary)}`;
+  toneCache.set(cacheKey, uri);
+  return uri;
+}
+
+function playHtmlTone(frequency = 880, duration = 120, delayMs = 0) {
+  window.setTimeout(() => {
+    const audio = new Audio(makeWavDataUri(frequency, duration));
+    audio.preload = 'auto';
+    audio.volume = 1;
+    audio.play().catch((error) => {
+      console.info('HTMLAudio playback failed.', error);
+    });
+  }, delayMs);
+}
 
 async function getAudioContext() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -36,6 +97,8 @@ function makeToneBuffer(audioCtx, frequency, duration, volume) {
 }
 
 async function playTone(frequency = 880, duration = 90, startOffset = 0, volume = 0.16) {
+  playHtmlTone(frequency, duration, startOffset * 1000);
+
   try {
     const audioCtx = await getAudioContext();
     if (!audioCtx) return false;
@@ -52,17 +115,24 @@ async function playTone(frequency = 880, duration = 90, startOffset = 0, volume 
 }
 
 async function unlockAudio() {
-  const played = await playTone(660, 45, 0, 0.08);
+  playHtmlTone(740, 120, 0);
+  const played = await playTone(740, 120, 0, 0.22);
   return played && sharedAudioContext?.state === 'running';
 }
 
 function playTickSound() {
-  playTone(920, 80, 0, 0.18);
+  playTone(920, 110, 0, 0.24);
 }
 
 function playFinalRing() {
-  playTone(1040, 130, 0, 0.18);
-  playTone(1320, 210, 0.14, 0.18);
+  playTone(1040, 150, 0, 0.24);
+  playTone(1320, 260, 0.16, 0.24);
+}
+
+function playSoundTest() {
+  playTone(740, 120, 0, 0.24);
+  playTone(920, 120, 0.16, 0.24);
+  playTone(1180, 180, 0.32, 0.24);
 }
 
 function formatTime(totalSeconds) {
@@ -208,6 +278,7 @@ export default function App() {
     setSoundMode(nextMode);
     const unlocked = await unlockAudio();
     setAudioReady(unlocked);
+    playSoundTest();
   };
 
   const startTimer = async () => {
@@ -381,6 +452,15 @@ export default function App() {
                   title="소리 켜기/테스트"
                 >
                   {soundMode === 'off' ? '🔇' : '🔊'}
+                </button>
+
+                <button
+                  className="btn-secondary"
+                  style={{ borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}
+                  onClick={() => enableSound(soundMode === 'off' ? '5s' : soundMode)}
+                  type="button"
+                >
+                  소리 테스트
                 </button>
 
                 {soundMode !== 'off' && (
