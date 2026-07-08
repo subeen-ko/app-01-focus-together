@@ -454,15 +454,6 @@ export default function App() {
                   {soundMode === 'off' ? '🔇' : '🔊'}
                 </button>
 
-                <button
-                  className="btn-secondary"
-                  style={{ borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}
-                  onClick={() => enableSound(soundMode === 'off' ? '5s' : soundMode)}
-                  type="button"
-                >
-                  소리 테스트
-                </button>
-
                 {soundMode !== 'off' && (
                   <>
                     <button
