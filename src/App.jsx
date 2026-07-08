@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 let sharedAudioContext;
 
-function getAudioContext() {
+async function getAudioContext() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) return null;
 
@@ -11,72 +11,62 @@ function getAudioContext() {
   }
 
   if (sharedAudioContext.state === 'suspended') {
-    sharedAudioContext.resume();
+    await sharedAudioContext.resume();
   }
+
   return sharedAudioContext;
 }
 
-// Global AudioContext for mobile compatibility
-let globalAudioCtx = null;
-
-function initAudio() {
+async function unlockAudio() {
   try {
-    if (!globalAudioCtx) {
-      globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (globalAudioCtx.state === 'suspended') {
-      globalAudioCtx.resume();
-    }
-    
-    // Play a silent sound to force iOS Safari to unlock AudioContext
-    const oscillator = globalAudioCtx.createOscillator();
-    const gainNode = globalAudioCtx.createGain();
-    
-    gainNode.gain.value = 0; // Silent
+    const audioCtx = await getAudioContext();
+    if (!audioCtx) return false;
+
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.setValueAtTime(0.00001, audioCtx.currentTime);
     oscillator.connect(gainNode);
-    gainNode.connect(globalAudioCtx.destination);
-    
+    gainNode.connect(audioCtx.destination);
     oscillator.start();
-    oscillator.stop(globalAudioCtx.currentTime + 0.001);
-  } catch(e) {
-    console.error('Audio initialization failed', e);
+    oscillator.stop(audioCtx.currentTime + 0.01);
+
+    return true;
+  } catch (error) {
+    console.info('Audio unlock failed.', error);
+    return false;
   }
 }
 
-function playRetroBeep(frequency = 880, duration = 150) {
+async function playTone(frequency = 880, duration = 90, startOffset = 0, volume = 0.08) {
   try {
-    if (!globalAudioCtx) initAudio();
-    
-    const oscillator = globalAudioCtx.createOscillator();
-    const gainNode = globalAudioCtx.createGain();
-    
+    const audioCtx = await getAudioContext();
+    if (!audioCtx) return;
+
+    const startAt = audioCtx.currentTime + startOffset;
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
     oscillator.type = 'square';
-    oscillator.frequency.setValueAtTime(frequency, globalAudioCtx.currentTime);
-    
-    gainNode.gain.setValueAtTime(0.1, globalAudioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, globalAudioCtx.currentTime + duration/1000);
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(globalAudioCtx.destination);
-    
-    oscillator.start();
-    oscillator.stop(globalAudioCtx.currentTime + duration/1000);
-  } catch(e) {
-    console.error('AudioContext not supported or blocked', e);
-  }
-}
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+    gainNode.gain.setValueAtTime(volume, startAt);
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, startAt + duration / 1000);
 
-function playTone(frequency = 880, duration = 90, startOffset = 0, volume = 0.08) {
-  playRetroBeep(frequency, duration);
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.start(startAt);
+    oscillator.stop(startAt + duration / 1000);
+  } catch (error) {
+    console.info('Audio playback failed.', error);
+  }
 }
 
 function playTickSound() {
-  playTone(920, 75, 0, 0.06);
+  playTone(920, 75, 0, 0.07);
 }
 
 function playFinalRing() {
-  playTone(1040, 120, 0, 0.08);
-  playTone(1320, 180, 0.13, 0.08);
+  playTone(1040, 120, 0, 0.09);
+  playTone(1320, 190, 0.14, 0.09);
 }
 
 function formatTime(totalSeconds) {
@@ -97,7 +87,9 @@ export default function App() {
   const [breakInput, setBreakInput] = useState(0);
   const [setsInput, setSetsInput] = useState(5);
   const [activeInput, setActiveInput] = useState('focus');
-  const [soundMode, setSoundMode] = useState('5s'); // '5s', 'all', 'off'
+  const [soundMode, setSoundMode] = useState('5s');
+  const [audioReady, setAudioReady] = useState(false);
+  const [wakeLockActive, setWakeLockActive] = useState(false);
 
   const [phase, setPhase] = useState('idle');
   const [endTime, setEndTime] = useState(null);
@@ -106,7 +98,9 @@ export default function App() {
   const [now, setNow] = useState(Date.now());
 
   const lastTickedSecond = useRef(null);
-  const lastBeepedSecond = useRef(null);
+  const wakeLockRef = useRef(null);
+
+  const isRunning = phase === 'focus' || phase === 'break';
 
   useEffect(() => {
     if (phase === 'idle' || phase === 'clear' || countdownStep) return undefined;
@@ -115,13 +109,60 @@ export default function App() {
     return () => clearInterval(interval);
   }, [phase, countdownStep]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function requestWakeLock() {
+      if (!('wakeLock' in navigator) || !isRunning || document.visibilityState !== 'visible') return;
+
+      try {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        wakeLockRef.current.addEventListener('release', () => {
+          if (!cancelled) setWakeLockActive(false);
+        });
+        if (!cancelled) setWakeLockActive(true);
+      } catch (error) {
+        console.info('Screen Wake Lock is unavailable.', error);
+        if (!cancelled) setWakeLockActive(false);
+      }
+    }
+
+    async function releaseWakeLock() {
+      if (wakeLockRef.current) {
+        await wakeLockRef.current.release().catch(() => {});
+        wakeLockRef.current = null;
+      }
+      if (!cancelled) setWakeLockActive(false);
+    }
+
+    if (isRunning) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isRunning) {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (!isRunning) releaseWakeLock();
+    };
+  }, [isRunning]);
+
   let secondsLeft = phase === 'idle' ? focusInput : 0;
   if (endTime && now < endTime) {
     secondsLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
   }
 
   let exactProgress = 0;
-  if ((phase === 'focus' || phase === 'break') && endTime) {
+  if (isRunning && endTime) {
     const totalMs = (phase === 'focus' ? focusInput : breakInput) * 1000;
     if (totalMs > 0) {
       const msLeft = Math.max(0, endTime - now);
@@ -130,12 +171,11 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (phase === 'idle' || phase === 'clear' || !endTime) return;
+    if (!isRunning || !endTime) return;
 
     if (now >= endTime) {
       if (soundMode !== 'off') playFinalRing();
       lastTickedSecond.current = null;
-      lastBeepedSecond.current = null;
 
       if (phase === 'focus') {
         if (currentSet >= setsInput) {
@@ -159,21 +199,26 @@ export default function App() {
       }
     } else if (secondsLeft > 0 && lastTickedSecond.current !== secondsLeft) {
       lastTickedSecond.current = secondsLeft;
-      
-      if (soundMode === 'all') {
-        playRetroBeep(880, 100);
-      } else if (soundMode === '5s') {
-        if (secondsLeft <= 5) {
-          playRetroBeep(880, 100);
-        }
-      }
-      // 'off'일 때는 아무 소리도 내지 않음 (조용히 카운트다운)
-    }
-  }, [now, endTime, phase, currentSet, setsInput, focusInput, breakInput, secondsLeft, soundMode]);
 
-  const startTimer = () => {
-    initAudio(); 
-    
+      if (soundMode === 'all' || (soundMode === '5s' && secondsLeft <= 5)) {
+        playTickSound();
+      }
+    }
+  }, [now, endTime, phase, currentSet, setsInput, focusInput, breakInput, secondsLeft, soundMode, isRunning]);
+
+  const enableSound = async (nextMode = soundMode === 'off' ? '5s' : soundMode) => {
+    const unlocked = await unlockAudio();
+    setAudioReady(unlocked);
+    setSoundMode(nextMode);
+    if (unlocked && nextMode !== 'off') playTickSound();
+  };
+
+  const startTimer = async () => {
+    if (soundMode !== 'off') {
+      const unlocked = await unlockAudio();
+      setAudioReady(unlocked);
+    }
+
     const focusSeconds = focusInput > 0 ? focusInput : 30;
     const currentTime = Date.now();
     const startTime = currentTime + 1000;
@@ -185,7 +230,6 @@ export default function App() {
     setCurrentSet(1);
     setPhase('focus');
     lastTickedSecond.current = null;
-    lastBeepedSecond.current = null;
     if (soundMode !== 'off') playTickSound();
 
     setTimeout(() => {
@@ -200,7 +244,6 @@ export default function App() {
     setCurrentSet(1);
     setCountdownStep(null);
     lastTickedSecond.current = null;
-    lastBeepedSecond.current = null;
   };
 
   const addTime = (seconds) => {
@@ -229,7 +272,7 @@ export default function App() {
     : secondsLeft;
 
   return (
-    <main className="wireframe-container" aria-label="같이집중 레트로 타이머">
+    <main className="wireframe-container" aria-label="레트로 집중 타이머">
       <section className="retro-box status-box" style={{ borderColor: boxBorderColor }}>
         <span className="status-text">{statusText}</span>
       </section>
@@ -243,11 +286,17 @@ export default function App() {
           {countdownStep || formatTime(displayedSeconds)}
         </div>
 
-        {(phase === 'focus' || phase === 'break') && (
-          <div style={{ width: '100%', height: '15px', border: `2px dashed ${boxBorderColor}`, position: 'relative', marginTop: '30px', background: 'transparent' }}>
-            <div style={{ width: `${Math.min(100, exactProgress * 100)}%`, height: '100%', background: boxBorderColor, opacity: 0.3 }}></div>
-            <div style={{ position: 'absolute', top: '-11px', left: `calc(${Math.min(100, exactProgress * 100)}% - 12px)`, fontSize: '24px', textShadow: '2px 2px 0px var(--bg)' }}>
-              ❤️
+        {isRunning && (
+          <div className="progress-track" aria-label="타이머 진행률">
+            <div
+              className="progress-fill"
+              style={{ width: `${Math.min(100, exactProgress * 100)}%`, background: boxBorderColor }}
+            />
+            <div
+              className="progress-runner"
+              style={{ left: `calc(${Math.min(100, exactProgress * 100)}% - 12px)` }}
+            >
+              🚀
             </div>
           </div>
         )}
@@ -323,45 +372,40 @@ export default function App() {
                 </button>
               </div>
 
-              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', marginTop: '30px', width: '100%'}}>
-                <button 
-                  className="btn-secondary" 
+              <div className="sound-controls">
+                <button
+                  className="btn-secondary sound-toggle"
                   style={{
-                    padding: '10px 15px', 
-                    fontSize: '24px', 
-                    borderColor: soundMode !== 'off' ? 'var(--accent-pink)' : 'var(--border)', 
+                    borderColor: soundMode !== 'off' ? 'var(--accent-pink)' : 'var(--border)',
                     color: soundMode !== 'off' ? 'var(--accent-pink)' : 'var(--text)',
-                    borderRadius: '50%'
-                  }} 
+                  }}
                   onClick={() => {
-                    if (soundMode === 'off') setSoundMode('5s');
+                    if (soundMode === 'off') enableSound('5s');
                     else setSoundMode('off');
                   }}
                   type="button"
-                  title={soundMode === 'off' ? "소리 켜기" : "소리 끄기"}
+                  title={soundMode === 'off' ? '소리 켜기' : '소리 끄기'}
                 >
                   {soundMode === 'off' ? '🔇' : '🔊'}
                 </button>
 
                 {soundMode !== 'off' && (
-                  <button 
-                    className="btn-secondary" 
-                    style={{
-                      padding: '8px 15px', 
-                      fontSize: '14px', 
-                      borderColor: 'var(--accent-pink)', 
-                      color: 'var(--accent-pink)'
-                    }} 
-                    onClick={() => {
-                      if (soundMode === '5s') setSoundMode('all');
-                      else setSoundMode('5s');
-                    }}
+                  <button
+                    className="btn-secondary"
+                    style={{ borderColor: 'var(--accent-pink)', color: 'var(--accent-pink)' }}
+                    onClick={() => enableSound(soundMode === '5s' ? 'all' : '5s')}
                     type="button"
                   >
-                    {soundMode === '5s' ? '마지막 5초만' : '매 초마다'}
+                    {soundMode === '5s' ? '마지막 5초만' : '매초 띠'}
                   </button>
                 )}
               </div>
+
+              {soundMode !== 'off' && (
+                <p className="tiny-note">
+                  {audioReady ? '소리 준비 완료' : '시작 버튼을 누르면 소리가 준비돼요'}
+                </p>
+              )}
             </div>
           </>
         )}
@@ -378,33 +422,21 @@ export default function App() {
             START!
           </button>
         ) : (
-          <button
-            className="btn-secondary"
-            onClick={stopTimer}
-            style={{ width: '100%', padding: '15px', marginTop: '10px' }}
-            type="button"
-          >
-            중단하고 처음으로
-          </button>
+          <>
+            <button
+              className="btn-secondary"
+              onClick={stopTimer}
+              style={{ width: '100%', padding: '15px', marginTop: '10px' }}
+              type="button"
+            >
+              중단하고 처음으로
+            </button>
+            <p className="tiny-note">{wakeLockActive ? '화면 유지 ON' : '브라우저가 화면 유지를 제한할 수 있어요'}</p>
+          </>
         )}
       </section>
 
-      {/* 광고 배너 Placeholder */}
-      <div 
-        aria-label="광고 영역"
-        style={{
-          marginTop: '30px',
-          width: '100%',
-          height: '80px',
-          border: '2px dashed var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--border)',
-          fontSize: '12px',
-          opacity: 0.5
-        }}
-      >
+      <div className="ad-placeholder" aria-label="광고 영역">
         ADVERTISEMENT
       </div>
     </main>

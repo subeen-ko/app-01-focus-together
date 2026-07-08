@@ -103,6 +103,30 @@ button, input, select {
   transform-origin: center;
 }
 
+.progress-track {
+  width: 100%;
+  height: 15px;
+  border: 2px dashed currentColor;
+  position: relative;
+  margin-top: 30px;
+  color: inherit;
+  background: transparent;
+}
+
+.progress-fill {
+  height: 100%;
+  opacity: 0.3;
+}
+
+.progress-runner {
+  position: absolute;
+  top: -13px;
+  font-size: 24px;
+  line-height: 1;
+  text-shadow: 2px 2px 0 var(--bg);
+  transition: left 0.1s linear;
+}
+
 .input-group {
   display: flex;
   width: 100%;
@@ -276,6 +300,45 @@ button, input, select {
   gap: 20px;
 }
 
+.sound-controls {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.sound-toggle {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 24px;
+}
+
+.tiny-note {
+  margin: 12px 0 0;
+  color: #aaaab8;
+  font-size: 12px;
+  text-align: center;
+}
+
+.ad-placeholder {
+  margin-top: 30px;
+  width: 100%;
+  height: 80px;
+  border: 2px dashed var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--border);
+  font-size: 12px;
+  opacity: 0.5;
+}
+
 @media (max-width: 480px) {
   #root {
     align-items: center;
@@ -314,6 +377,13 @@ button, input, select {
     font-size: clamp(27px, 8.1vw, 38px);
     letter-spacing: -1px;
     text-shadow: 2px 2px 0 var(--border);
+  }
+  .sound-controls {
+    gap: 10px;
+  }
+  .sound-controls .btn-secondary:not(.sound-toggle) {
+    padding: 9px 12px;
+    font-size: 13px;
   }
 }
 
