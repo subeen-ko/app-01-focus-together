@@ -17,56 +17,52 @@ async function getAudioContext() {
   return sharedAudioContext;
 }
 
-async function unlockAudio() {
+function makeToneBuffer(audioCtx, frequency, duration, volume) {
+  const sampleRate = audioCtx.sampleRate;
+  const frameCount = Math.max(1, Math.floor(sampleRate * (duration / 1000)));
+  const buffer = audioCtx.createBuffer(1, frameCount, sampleRate);
+  const data = buffer.getChannelData(0);
+  const fadeFrames = Math.max(1, Math.floor(sampleRate * 0.01));
+
+  for (let i = 0; i < frameCount; i += 1) {
+    const t = i / sampleRate;
+    const wave = Math.sin(2 * Math.PI * frequency * t);
+    const fadeIn = Math.min(1, i / fadeFrames);
+    const fadeOut = Math.min(1, (frameCount - i) / fadeFrames);
+    data[i] = wave * volume * Math.min(fadeIn, fadeOut);
+  }
+
+  return buffer;
+}
+
+async function playTone(frequency = 880, duration = 90, startOffset = 0, volume = 0.16) {
   try {
     const audioCtx = await getAudioContext();
     if (!audioCtx) return false;
 
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(0.00001, audioCtx.currentTime);
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.01);
-
+    const source = audioCtx.createBufferSource();
+    source.buffer = makeToneBuffer(audioCtx, frequency, duration, volume);
+    source.connect(audioCtx.destination);
+    source.start(audioCtx.currentTime + startOffset);
     return true;
   } catch (error) {
-    console.info('Audio unlock failed.', error);
+    console.info('Audio playback failed.', error);
     return false;
   }
 }
 
-async function playTone(frequency = 880, duration = 90, startOffset = 0, volume = 0.08) {
-  try {
-    const audioCtx = await getAudioContext();
-    if (!audioCtx) return;
-
-    const startAt = audioCtx.currentTime + startOffset;
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-
-    oscillator.type = 'square';
-    oscillator.frequency.setValueAtTime(frequency, startAt);
-    gainNode.gain.setValueAtTime(volume, startAt);
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, startAt + duration / 1000);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.start(startAt);
-    oscillator.stop(startAt + duration / 1000);
-  } catch (error) {
-    console.info('Audio playback failed.', error);
-  }
+async function unlockAudio() {
+  const played = await playTone(660, 45, 0, 0.08);
+  return played && sharedAudioContext?.state === 'running';
 }
 
 function playTickSound() {
-  playTone(920, 75, 0, 0.07);
+  playTone(920, 80, 0, 0.18);
 }
 
 function playFinalRing() {
-  playTone(1040, 120, 0, 0.09);
-  playTone(1320, 190, 0.14, 0.09);
+  playTone(1040, 130, 0, 0.18);
+  playTone(1320, 210, 0.14, 0.18);
 }
 
 function formatTime(totalSeconds) {
@@ -112,12 +108,22 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
 
+    async function releaseWakeLock() {
+      if (wakeLockRef.current) {
+        await wakeLockRef.current.release().catch(() => {});
+        wakeLockRef.current = null;
+      }
+      if (!cancelled) setWakeLockActive(false);
+    }
+
     async function requestWakeLock() {
       if (!('wakeLock' in navigator) || !isRunning || document.visibilityState !== 'visible') return;
 
       try {
+        if (wakeLockRef.current) return;
         wakeLockRef.current = await navigator.wakeLock.request('screen');
         wakeLockRef.current.addEventListener('release', () => {
+          wakeLockRef.current = null;
           if (!cancelled) setWakeLockActive(false);
         });
         if (!cancelled) setWakeLockActive(true);
@@ -125,14 +131,6 @@ export default function App() {
         console.info('Screen Wake Lock is unavailable.', error);
         if (!cancelled) setWakeLockActive(false);
       }
-    }
-
-    async function releaseWakeLock() {
-      if (wakeLockRef.current) {
-        await wakeLockRef.current.release().catch(() => {});
-        wakeLockRef.current = null;
-      }
-      if (!cancelled) setWakeLockActive(false);
     }
 
     if (isRunning) {
@@ -207,10 +205,9 @@ export default function App() {
   }, [now, endTime, phase, currentSet, setsInput, focusInput, breakInput, secondsLeft, soundMode, isRunning]);
 
   const enableSound = async (nextMode = soundMode === 'off' ? '5s' : soundMode) => {
+    setSoundMode(nextMode);
     const unlocked = await unlockAudio();
     setAudioReady(unlocked);
-    setSoundMode(nextMode);
-    if (unlocked && nextMode !== 'off') playTickSound();
   };
 
   const startTimer = async () => {
@@ -379,31 +376,33 @@ export default function App() {
                     borderColor: soundMode !== 'off' ? 'var(--accent-pink)' : 'var(--border)',
                     color: soundMode !== 'off' ? 'var(--accent-pink)' : 'var(--text)',
                   }}
-                  onClick={() => {
-                    if (soundMode === 'off') enableSound('5s');
-                    else setSoundMode('off');
-                  }}
+                  onClick={() => enableSound(soundMode === 'off' ? '5s' : soundMode)}
                   type="button"
-                  title={soundMode === 'off' ? '소리 켜기' : '소리 끄기'}
+                  title="소리 켜기/테스트"
                 >
                   {soundMode === 'off' ? '🔇' : '🔊'}
                 </button>
 
                 {soundMode !== 'off' && (
-                  <button
-                    className="btn-secondary"
-                    style={{ borderColor: 'var(--accent-pink)', color: 'var(--accent-pink)' }}
-                    onClick={() => enableSound(soundMode === '5s' ? 'all' : '5s')}
-                    type="button"
-                  >
-                    {soundMode === '5s' ? '마지막 5초만' : '매초 띠'}
-                  </button>
+                  <>
+                    <button
+                      className="btn-secondary"
+                      style={{ borderColor: 'var(--accent-pink)', color: 'var(--accent-pink)' }}
+                      onClick={() => enableSound(soundMode === '5s' ? 'all' : '5s')}
+                      type="button"
+                    >
+                      {soundMode === '5s' ? '마지막 5초만' : '매초마다'}
+                    </button>
+                    <button className="btn-secondary" onClick={() => setSoundMode('off')} type="button">
+                      끄기
+                    </button>
+                  </>
                 )}
               </div>
 
               {soundMode !== 'off' && (
                 <p className="tiny-note">
-                  {audioReady ? '소리 준비 완료' : '시작 버튼을 누르면 소리가 준비돼요'}
+                  {audioReady ? '소리 준비 완료' : '스피커 버튼을 눌러 소리를 테스트해 주세요'}
                 </p>
               )}
             </div>
