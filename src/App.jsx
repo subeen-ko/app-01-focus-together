@@ -185,6 +185,7 @@ export default function App() {
   const [soundMode, setSoundMode] = useState('5s');
   const [audioReady, setAudioReady] = useState(false);
   const [wakeLockActive, setWakeLockActive] = useState(false);
+  const [lang, setLang] = useState('ko');
 
   const [phase, setPhase] = useState('idle');
   const [endTime, setEndTime] = useState(null);
@@ -196,6 +197,47 @@ export default function App() {
   const wakeLockRef = useRef(null);
 
   const isRunning = phase === 'focus' || phase === 'break';
+
+  const t = {
+    ko: {
+      planGame: 'PLAN GAME',
+      focusPhase: '집중 중!',
+      breakPhase: '쉬는 시간!',
+      clearPhase: '완료!!',
+      focusTime: '집중 시간',
+      breakTime: '쉬는 시간',
+      clear: '초기화',
+      setsTitle: '반복 세트 수',
+      soundReady: '소리 준비 완료',
+      soundTestPrompt: '스피커 버튼을 눌러 소리를 테스트해 주세요',
+      onlyLast5s: '마지막 5초만',
+      everySec: '매초마다',
+      off: '끄기',
+      start: 'START!',
+      stopReset: '중단하고 처음으로',
+      wakeLockOn: '화면 유지 ON',
+      wakeLockWarn: '브라우저가 화면 유지를 제한할 수 있어요'
+    },
+    en: {
+      planGame: 'PLAN GAME',
+      focusPhase: 'DO TIME!',
+      breakPhase: 'BREAK TIME!',
+      clearPhase: 'DONE!!',
+      focusTime: 'DO TIME',
+      breakTime: 'REST TIME',
+      clear: 'CLEAR',
+      setsTitle: 'SETS',
+      soundReady: 'SOUND READY',
+      soundTestPrompt: 'TAP SPEAKER TO TEST SOUND',
+      onlyLast5s: 'LAST 5s',
+      everySec: 'EVERY SEC',
+      off: 'OFF',
+      start: 'START!',
+      stopReset: 'STOP & RESET',
+      wakeLockOn: 'SCREEN WAKE ON',
+      wakeLockWarn: 'Browser may limit screen wake'
+    }
+  };
 
   useEffect(() => {
     if (phase === 'idle' || phase === 'clear' || countdownStep) return undefined;
@@ -353,11 +395,11 @@ export default function App() {
     if (activeInput === 'break') setBreakInput(0);
   };
 
-  let statusText = 'PLAN GAME';
+  let statusText = t[lang].planGame;
   if (countdownStep) statusText = countdownStep;
-  else if (phase === 'focus') statusText = `SET ${currentSet}/${setsInput} : FOCUS!`;
-  else if (phase === 'break') statusText = `SET ${currentSet}/${setsInput} : BREAK!`;
-  else if (phase === 'clear') statusText = 'CLEAR!!';
+  else if (phase === 'focus') statusText = `SET ${currentSet}/${setsInput} : ${t[lang].focusPhase}`;
+  else if (phase === 'break') statusText = `SET ${currentSet}/${setsInput} : ${t[lang].breakPhase}`;
+  else if (phase === 'clear') statusText = t[lang].clearPhase;
 
   let boxBorderColor = 'var(--border)';
   if (phase === 'focus') boxBorderColor = 'var(--accent-pink)';
@@ -370,6 +412,16 @@ export default function App() {
 
   return (
     <main className="wireframe-container" aria-label="같이집중 레트로 타이머">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', marginBottom: '-10px' }}>
+        <button 
+          className="btn-secondary" 
+          style={{ fontSize: '12px', padding: '5px 10px', borderRadius: '4px' }}
+          onClick={() => setLang(l => l === 'ko' ? 'en' : 'ko')}
+        >
+          {lang === 'ko' ? '🇺🇸 EN' : '🇰🇷 KO'}
+        </button>
+      </div>
+
       {/* 광고 배너 (상단 전광판 간판 역할) */}
       {phase !== 'idle' && (
         <div className="ad-container" style={{ margin: '0 auto', display: 'flex', justifyContent: 'center' }}>
@@ -417,7 +469,7 @@ export default function App() {
                 onClick={() => setActiveInput('focus')}
                 type="button"
               >
-                집중 시간
+                {t[lang].focusTime}
               </button>
               <button
                 className="btn-toggle"
@@ -428,7 +480,7 @@ export default function App() {
                 onClick={() => setActiveInput('break')}
                 type="button"
               >
-                쉬는 시간
+                {t[lang].breakTime}
               </button>
             </div>
 
@@ -446,12 +498,12 @@ export default function App() {
                 style={{ borderColor: 'var(--accent-pink)' }}
                 type="button"
               >
-                초기화
+                {t[lang].clear}
               </button>
             </div>
 
             <div className="settings-row">
-              <span style={{ fontSize: '14px', marginBottom: '10px' }}>반복 세트 수</span>
+              <span style={{ fontSize: '14px', marginBottom: '10px' }}>{t[lang].setsTitle}</span>
               <div className="setting-controls">
                 <button
                   className="btn-secondary"
@@ -498,10 +550,10 @@ export default function App() {
                       onClick={() => enableSound(soundMode === '5s' ? 'all' : '5s')}
                       type="button"
                     >
-                      {soundMode === '5s' ? '마지막 5초만' : '매초마다'}
+                      {soundMode === '5s' ? t[lang].onlyLast5s : t[lang].everySec}
                     </button>
                     <button className="btn-secondary" onClick={() => setSoundMode('off')} type="button">
-                      끄기
+                      {t[lang].off}
                     </button>
                   </>
                 )}
@@ -509,7 +561,7 @@ export default function App() {
 
               {soundMode !== 'off' && (
                 <p className="tiny-note">
-                  {audioReady ? '소리 준비 완료' : '스피커 버튼을 눌러 소리를 테스트해 주세요'}
+                  {audioReady ? t[lang].soundReady : t[lang].soundTestPrompt}
                 </p>
               )}
             </div>
@@ -525,7 +577,7 @@ export default function App() {
             style={{ backgroundColor: 'var(--accent-pink)', borderColor: 'var(--accent-pink)' }}
             type="button"
           >
-            START!
+            {t[lang].start}
           </button>
         ) : (
           <>
@@ -535,9 +587,9 @@ export default function App() {
               style={{ width: '100%', padding: '15px', marginTop: '10px' }}
               type="button"
             >
-              중단하고 처음으로
+              {t[lang].stopReset}
             </button>
-            <p className="tiny-note">{wakeLockActive ? '화면 유지 ON' : '브라우저가 화면 유지를 제한할 수 있어요'}</p>
+            <p className="tiny-note">{wakeLockActive ? t[lang].wakeLockOn : t[lang].wakeLockWarn}</p>
           </>
         )}
       </section>
