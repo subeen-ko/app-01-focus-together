@@ -507,7 +507,7 @@ export default function App() {
       </section>
 
       <div className="ad-placeholder" aria-label="광고 영역">
-        ADVERTISEMENT
+        ADVERTISEMENT (320x100)
       </div>
     </main>
   );
