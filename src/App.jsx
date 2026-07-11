@@ -216,7 +216,10 @@ export default function App() {
       start: 'START!',
       stopReset: '중단하고 처음으로',
       wakeLockOn: '화면 유지 ON',
-      wakeLockWarn: '브라우저가 화면 유지를 제한할 수 있어요'
+      wakeLockWarn: '브라우저가 화면 유지를 제한할 수 있어요',
+      sec: '초',
+      min: '분',
+      hr: '시간'
     },
     en: {
       planGame: 'PLAN GAME',
@@ -235,7 +238,10 @@ export default function App() {
       start: 'START!',
       stopReset: 'STOP & RESET',
       wakeLockOn: 'SCREEN WAKE ON',
-      wakeLockWarn: 'Browser may limit screen wake'
+      wakeLockWarn: 'Browser may limit screen wake',
+      sec: 's',
+      min: 'm',
+      hr: 'h'
     }
   };
 
@@ -485,13 +491,13 @@ export default function App() {
             </div>
 
             <div className="quick-add-buttons" aria-label="빠른 시간 추가">
-              <button className="btn-quick" onClick={() => addTime(1)} type="button">+1초</button>
-              <button className="btn-quick" onClick={() => addTime(10)} type="button">+10초</button>
-              <button className="btn-quick" onClick={() => addTime(30)} type="button">+30초</button>
-              <button className="btn-quick" onClick={() => addTime(60)} type="button">+1분</button>
-              <button className="btn-quick" onClick={() => addTime(600)} type="button">+10분</button>
-              <button className="btn-quick" onClick={() => addTime(1800)} type="button">+30분</button>
-              <button className="btn-quick" onClick={() => addTime(3600)} type="button">+1시간</button>
+              <button className="btn-quick" onClick={() => addTime(1)} type="button">+1{t[lang].sec}</button>
+              <button className="btn-quick" onClick={() => addTime(10)} type="button">+10{t[lang].sec}</button>
+              <button className="btn-quick" onClick={() => addTime(30)} type="button">+30{t[lang].sec}</button>
+              <button className="btn-quick" onClick={() => addTime(60)} type="button">+1{t[lang].min}</button>
+              <button className="btn-quick" onClick={() => addTime(600)} type="button">+10{t[lang].min}</button>
+              <button className="btn-quick" onClick={() => addTime(1800)} type="button">+30{t[lang].min}</button>
+              <button className="btn-quick" onClick={() => addTime(3600)} type="button">+1{t[lang].hr}</button>
               <button
                 className="btn-quick"
                 onClick={clearTime}
