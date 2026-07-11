@@ -340,7 +340,12 @@ export default function App() {
     : secondsLeft;
 
   return (
-    <main className="wireframe-container" aria-label="레트로 집중 타이머">
+    <main className="wireframe-container" aria-label="같이집중 레트로 타이머">
+      {/* 광고 배너 Placeholder (상단 전광판 간판 역할) */}
+      <div className="ad-placeholder" aria-label="광고 영역" style={{ margin: '0 auto' }}>
+        ADVERTISEMENT (320x100)
+      </div>
+
       <section className="retro-box status-box" style={{ borderColor: boxBorderColor }}>
         <span className="status-text">{statusText}</span>
       </section>
@@ -505,10 +510,6 @@ export default function App() {
           </>
         )}
       </section>
-
-      <div className="ad-placeholder" aria-label="광고 영역">
-        ADVERTISEMENT (320x100)
-      </div>
     </main>
   );
 }
