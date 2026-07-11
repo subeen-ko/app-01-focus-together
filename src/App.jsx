@@ -1,5 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+function AdFitBanner() {
+  const adRef = useRef(null);
+
+  useEffect(() => {
+    const isScriptLoaded = document.getElementById('adfit-script');
+    
+    if (!isScriptLoaded) {
+      const script = document.createElement('script');
+      script.id = 'adfit-script';
+      script.type = 'text/javascript';
+      script.src = '//t1.kakaocdn.net/kas/static/ba.min.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  return (
+    <div ref={adRef} className="adfit-wrapper">
+      <ins
+        className="kakao_ad_area"
+        style={{ display: 'none' }}
+        data-ad-unit="DAN-xo4vUv6nINxeqGFk"
+        data-ad-width="320"
+        data-ad-height="100"
+      ></ins>
+    </div>
+  );
+}
+
 let sharedAudioContext;
 const toneCache = new Map();
 
@@ -341,10 +370,10 @@ export default function App() {
 
   return (
     <main className="wireframe-container" aria-label="같이집중 레트로 타이머">
-      {/* 광고 배너 Placeholder (상단 전광판 간판 역할) */}
+      {/* 광고 배너 (상단 전광판 간판 역할) */}
       {phase !== 'idle' && (
-        <div className="ad-placeholder" aria-label="광고 영역" style={{ margin: '0 auto' }}>
-          ADVERTISEMENT (320x100)
+        <div className="ad-container" style={{ margin: '0 auto', display: 'flex', justifyContent: 'center' }}>
+          <AdFitBanner />
         </div>
       )}
 
