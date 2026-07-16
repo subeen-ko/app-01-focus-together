@@ -10,7 +10,7 @@
 
 ## 화면 미리보기
 
-![운동 타이머 미리보기](./images/workout-timer-preview.svg)
+![운동 타이머 미리보기](./images/workout-timer-cover.png)
 
 ## 현재 컨셉
 

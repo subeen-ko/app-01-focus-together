@@ -9,7 +9,7 @@
 
 ## 미리보기
 
-![운동 타이머 미리보기]("C:\Users\subin\OneDrive\Desktop\BNKO\바이브코딩\#1 운동용 타이머\#1 표지.png")
+![운동 타이머 미리보기](./docs/images/workout-timer-cover.png)
 
 ## 주요 기능
 
