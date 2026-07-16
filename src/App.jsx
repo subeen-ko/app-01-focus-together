@@ -178,10 +178,10 @@ function formatTime(totalSeconds) {
 }
 
 export default function App() {
-  const [focusInput, setFocusInput] = useState(0);
+  const [workoutInput, setWorkoutInput] = useState(0);
   const [breakInput, setBreakInput] = useState(0);
   const [setsInput, setSetsInput] = useState(5);
-  const [activeInput, setActiveInput] = useState('focus');
+  const [activeInput, setActiveInput] = useState('workout');
   const [soundMode, setSoundMode] = useState('5s');
   const [audioReady, setAudioReady] = useState(false);
   const [wakeLockActive, setWakeLockActive] = useState(false);
@@ -196,15 +196,15 @@ export default function App() {
   const lastTickedSecond = useRef(null);
   const wakeLockRef = useRef(null);
 
-  const isRunning = phase === 'focus' || phase === 'break';
+  const isRunning = phase === 'workout' || phase === 'break';
 
   const t = {
     ko: {
       planGame: 'PLAN GAME',
-      focusPhase: '집중 중!',
+      workoutPhase: '운동 중!',
       breakPhase: '쉬는 시간!',
       clearPhase: '완료!!',
-      focusTime: '집중 시간',
+      workoutTime: '운동 시간',
       breakTime: '쉬는 시간',
       clear: '초기화',
       setsTitle: '반복 세트 수',
@@ -223,10 +223,10 @@ export default function App() {
     },
     en: {
       planGame: 'PLAN GAME',
-      focusPhase: 'DO!',
+      workoutPhase: 'WORKOUT!',
       breakPhase: 'REST!',
       clearPhase: 'DONE!!',
-      focusTime: 'DO',
+      workoutTime: 'WORKOUT',
       breakTime: 'REST',
       clear: 'CLEAR',
       setsTitle: 'SETS',
@@ -301,14 +301,14 @@ export default function App() {
     };
   }, [isRunning]);
 
-  let secondsLeft = phase === 'idle' ? focusInput : 0;
+  let secondsLeft = phase === 'idle' ? workoutInput : 0;
   if (endTime && now < endTime) {
     secondsLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
   }
 
   let exactProgress = 0;
   if (isRunning && endTime) {
-    const totalMs = (phase === 'focus' ? focusInput : breakInput) * 1000;
+    const totalMs = (phase === 'workout' ? workoutInput : breakInput) * 1000;
     if (totalMs > 0) {
       const msLeft = Math.max(0, endTime - now);
       exactProgress = 1 - (msLeft / totalMs);
@@ -322,7 +322,7 @@ export default function App() {
       if (soundMode !== 'off') playFinalRing();
       lastTickedSecond.current = null;
 
-      if (phase === 'focus') {
+      if (phase === 'workout') {
         if (currentSet >= setsInput) {
           setPhase('clear');
           setEndTime(null);
@@ -335,12 +335,12 @@ export default function App() {
           setEndTime(Date.now() + breakInput * 1000);
         } else {
           setCurrentSet((set) => set + 1);
-          setEndTime(Date.now() + focusInput * 1000);
+          setEndTime(Date.now() + workoutInput * 1000);
         }
       } else if (phase === 'break') {
-        setPhase('focus');
+        setPhase('workout');
         setCurrentSet((set) => set + 1);
-        setEndTime(Date.now() + focusInput * 1000);
+        setEndTime(Date.now() + workoutInput * 1000);
       }
     } else if (secondsLeft > 0 && lastTickedSecond.current !== secondsLeft) {
       lastTickedSecond.current = secondsLeft;
@@ -349,7 +349,7 @@ export default function App() {
         playTickSound();
       }
     }
-  }, [now, endTime, phase, currentSet, setsInput, focusInput, breakInput, secondsLeft, soundMode, isRunning]);
+  }, [now, endTime, phase, currentSet, setsInput, workoutInput, breakInput, secondsLeft, soundMode, isRunning]);
 
   const enableSound = async (nextMode = soundMode === 'off' ? '5s' : soundMode) => {
     setSoundMode(nextMode);
@@ -364,16 +364,16 @@ export default function App() {
       setAudioReady(unlocked);
     }
 
-    const focusSeconds = focusInput > 0 ? focusInput : 30;
+    const workoutSeconds = workoutInput > 0 ? workoutInput : 30;
     const currentTime = Date.now();
     const startTime = currentTime + 1000;
 
-    setFocusInput(focusSeconds);
+    setWorkoutInput(workoutSeconds);
     setNow(currentTime);
     setCountdownStep('START!');
-    setEndTime(startTime + focusSeconds * 1000);
+    setEndTime(startTime + workoutSeconds * 1000);
     setCurrentSet(1);
-    setPhase('focus');
+    setPhase('workout');
     lastTickedSecond.current = null;
     if (soundMode !== 'off') playTickSound();
 
@@ -392,32 +392,32 @@ export default function App() {
   };
 
   const addTime = (seconds) => {
-    if (activeInput === 'focus') setFocusInput((prev) => prev + seconds);
+    if (activeInput === 'workout') setWorkoutInput((prev) => prev + seconds);
     if (activeInput === 'break') setBreakInput((prev) => prev + seconds);
   };
 
   const clearTime = () => {
-    if (activeInput === 'focus') setFocusInput(0);
+    if (activeInput === 'workout') setWorkoutInput(0);
     if (activeInput === 'break') setBreakInput(0);
   };
 
   let statusText = t[lang].planGame;
   if (countdownStep) statusText = countdownStep;
-  else if (phase === 'focus') statusText = `SET ${currentSet}/${setsInput} : ${t[lang].focusPhase}`;
+  else if (phase === 'workout') statusText = `SET ${currentSet}/${setsInput} : ${t[lang].workoutPhase}`;
   else if (phase === 'break') statusText = `SET ${currentSet}/${setsInput} : ${t[lang].breakPhase}`;
   else if (phase === 'clear') statusText = t[lang].clearPhase;
 
   let boxBorderColor = 'var(--border)';
-  if (phase === 'focus') boxBorderColor = 'var(--accent-pink)';
+  if (phase === 'workout') boxBorderColor = 'var(--accent-pink)';
   if (phase === 'break') boxBorderColor = '#00FFCC';
   if (phase === 'clear') boxBorderColor = 'var(--accent-yellow)';
 
   const displayedSeconds = phase === 'idle'
-    ? activeInput === 'focus' ? focusInput : breakInput
+    ? activeInput === 'workout' ? workoutInput : breakInput
     : secondsLeft;
 
   return (
-    <main className="wireframe-container" aria-label="같이집중 레트로 타이머">
+    <main className="wireframe-container" aria-label="Workout Timer 레트로 운동 타이머">
       <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', marginBottom: '-10px' }}>
         <button 
           className="btn-secondary" 
@@ -469,13 +469,13 @@ export default function App() {
               <button
                 className="btn-toggle"
                 style={{
-                  borderColor: activeInput === 'focus' ? 'var(--accent-pink)' : 'var(--border)',
-                  color: activeInput === 'focus' ? 'var(--accent-pink)' : 'inherit',
+                  borderColor: activeInput === 'workout' ? 'var(--accent-pink)' : 'var(--border)',
+                  color: activeInput === 'workout' ? 'var(--accent-pink)' : 'inherit',
                 }}
-                onClick={() => setActiveInput('focus')}
+                onClick={() => setActiveInput('workout')}
                 type="button"
               >
-                {t[lang].focusTime}
+                {t[lang].workoutTime}
               </button>
               <button
                 className="btn-toggle"
